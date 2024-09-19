@@ -1,0 +1,77 @@
+import requests
+import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
+import openai
+
+# Everything is sampled for users to put in their own data. In order to use this you must set up your own NightScout
+
+# Part 1: Fetch Blood Sugar Data from Nightscout and Plot it
+
+# Replace with your Nightscout URL and API Secret
+nightscout_url = 'https://your-nightscout-instance.herokuapp.com/api/v1/entries.json'
+api_secret = 'your-api-secret'
+
+headers = {
+    'API-SECRET': api_secret
+}
+
+# Fetch blood sugar data from Nightscout
+response = requests.get(nightscout_url, headers=headers)
+glucose_data = response.json()
+
+# Parse dates and glucose values
+dates = [datetime.strptime(entry['dateString'], "%Y-%m-%dT%H:%M:%S.%fZ") for entry in glucose_data]
+glucose_values = [entry['sgv'] for entry in glucose_data]
+
+# Filtering data for the last 7 days (Weekly)
+now = datetime.now()
+one_week_ago = now - timedelta(days=7)
+weekly_data = [(date, value) for date, value in zip(dates, glucose_values) if date >= one_week_ago]
+
+# Separate the filtered data into two lists: weekly_dates and weekly_glucose
+weekly_dates, weekly_glucose = zip(*weekly_data)
+
+# Plot weekly blood sugar values
+plt.figure(figsize=(10, 6))
+plt.plot(weekly_dates, weekly_glucose, label='Blood Sugar Level (mg/dL)', color='green')
+plt.xlabel('Time')
+plt.ylabel('Blood Sugar (mg/dL)')
+plt.title('Blood Sugar Values Over the Week')
+plt.legend()
+plt.xticks(rotation=45)
+plt.tight_layout()
+
+# Save the plot as an image (e.g., PNG)
+plt.savefig('blood_sugar_graph.png')
+
+# Show the plot
+plt.show()
+
+
+# Part 2: Send Blood Sugar Data to ChatGPT for Advice
+
+# Set your OpenAI API key
+openai.api_key = 'your_openai_api_key'
+
+# Create a string that summarizes the blood sugar data to send to ChatGPT
+blood_sugar_summary = ', '.join([f"{value} at {date.strftime('%I:%M %p')}" for date, value in weekly_data])
+
+# Prepare a prompt for ChatGPT
+prompt = f"Given the following blood sugar data for a diabetic patient, provide advice: {blood_sugar_summary}"
+
+# Make a request to the OpenAI API
+response = openai.Completion.create(
+    engine="text-davinci-003",
+    prompt=prompt,
+    max_tokens=100,  # Adjust based on how much text you want
+    n=1,
+    stop=None,
+    temperature=0.7,
+)
+
+# Get the advice from the response
+advice = response.choices[0].text.strip()
+
+# Print or return the advice
+print("ChatGPT's Diabetic Advice:")
+print(advice)
